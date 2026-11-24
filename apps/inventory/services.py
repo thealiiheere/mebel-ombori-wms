@@ -6,6 +6,7 @@ views, the REST API and management commands alike.
 
 from __future__ import annotations
 
+import logging
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -21,6 +22,8 @@ from .models import (
     default_roles_for_category,
 )
 from .selectors import user_can_access_material
+
+logger = logging.getLogger("wms.security")
 
 CENTS = Decimal("0.01")
 PRICE_PLACES = Decimal("0.0001")
@@ -60,12 +63,41 @@ def _positive_quantity(material: BaseMaterial, value, field: str = "quantity") -
 
 def _require_admin(user) -> None:
     if not (getattr(user, "can_use_system", False) and user.is_warehouse_admin):
+        logger.warning(
+            "Security: unauthorized admin operation attempted by user '%s' (id: %s)",
+            getattr(user, "username", "anonymous"),
+            getattr(user, "pk", None),
+        )
         raise PermissionDenied(_("Bu amal faqat administratorlar uchun."))
 
 
 def _require_access(user, material: BaseMaterial) -> None:
     if not user_can_access_material(user, material):
+        logger.warning(
+            "Security: material access denied for user '%s' (roles: %s) to material '%s' (id: %s, category: %s)",
+            getattr(user, "username", "anonymous"),
+            getattr(user, "worker_roles", []),
+            material.name,
+            material.pk,
+            material.category,
+        )
         raise PermissionDenied(_("Bu material sizning kasbingiz uchun ruxsat etilmagan."))
+
+
+def _require_taker(user) -> None:
+    """Taking stock off the shelf is a worker's action, never an administrator's.
+
+    The administrator books arrivals, sets minimums and reads the history; the
+    ledger should name the person who actually carried the material away. Checked
+    here rather than only in the templates, so the REST API is bound by it too.
+    """
+    if getattr(user, "is_warehouse_admin", False):
+        logger.warning(
+            "Security: warehouse administrator '%s' (id: %s) attempted stock withdrawal",
+            getattr(user, "username", "anonymous"),
+            getattr(user, "pk", None),
+        )
+        raise PermissionDenied(_("Administrator ombordan material olmaydi — buni ishchi bajaradi."))
 
 
 def _locked_stock(material: BaseMaterial) -> WholeMaterial:
@@ -180,6 +212,7 @@ def record_kirim(
 # ---------------------------------------------------------------------------
 def withdraw_whole_material(*, material: BaseMaterial, user, quantity, notes: str = "") -> InventoryTransaction:
     """Worker takes whole units (sheets, litres, pieces...) from the shelf."""
+    _require_taker(user)
     _require_access(user, material)
     quantity = _positive_quantity(material, quantity)
 
@@ -212,6 +245,7 @@ def withdraw_whole_material(*, material: BaseMaterial, user, quantity, notes: st
 
 def withdraw_offcut(*, offcut: LeftoverOffcut, user, quantity: int = 1, notes: str = "") -> InventoryTransaction:
     """Worker reuses offcut piece(s). The record is removed once no pieces remain."""
+    _require_taker(user)
     _require_access(user, offcut.material)
     try:
         pieces = int(quantity)

@@ -3,16 +3,30 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from .models import User, normalize_roles
+from .models import User, normalize_phone, normalize_roles
 
 
 @transaction.atomic
-def register_worker(*, username: str, password: str, full_name: str, roles: list[str]) -> User:
-    """Create a self-registered worker. Access stays locked until an admin approves."""
+def register_worker(*, phone: str, password: str, full_name: str, roles: list[str]) -> User:
+    """Create a self-registered worker. Access stays locked until an admin approves.
+
+    The phone number is the login identifier and is mirrored into ``username``, which
+    is what Django's auth machinery still authenticates against.
+    """
     roles = normalize_roles(roles)
     if not roles:
         raise ValidationError({"roles": _("Kamida bitta kasbni tanlang.")})
-    user = User(username=username, full_name=full_name, roles=roles, is_approved=False, is_active=True)
+    phone = normalize_phone(phone)
+    if User.objects.filter(phone=phone).exists():
+        raise ValidationError({"phone": _("Bu raqam allaqachon ro'yxatdan o'tgan.")})
+    user = User(
+        username=phone,
+        phone=phone,
+        full_name=full_name,
+        roles=roles,
+        is_approved=False,
+        is_active=True,
+    )
     user.set_password(password)
     user.full_clean()
     user.save()

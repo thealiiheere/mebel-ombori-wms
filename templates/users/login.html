@@ -4,12 +4,12 @@
 {% block auth_content %}
 <div class="panel p-6 sm:p-8">
   <h1 class="font-bold" style="font-size:24px;line-height:32px">{% translate "Tizimga kirish" %}</h1>
-  <p class="mt-1 text-muted">{% translate "Sex omboriga login va parolingiz bilan kiring." %}</p>
+  <p class="mt-1 text-muted">{% translate "Sex omboriga telefon raqami va parolingiz bilan kiring." %}</p>
   <form method="post" class="form-stack mt-6" novalidate>
     {% csrf_token %}
     {% include "partials/form_errors.html" %}
     {% include "partials/field.html" with field=form.username %}
-    {% include "partials/field.html" with field=form.password %}
+    {% include "partials/password_field.html" with field=form.password %}
     <input type="hidden" name="next" value="{{ next }}">
     <button type="submit" class="btn btn-primary btn-lg btn-block mt-2">{% translate "Kirish" %}</button>
   </form>

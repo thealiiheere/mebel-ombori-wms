@@ -254,5 +254,6 @@ LOGGING = {
         "django.db.backends": {"level": "WARNING"},
         # Tests deliberately trigger 403/404s; keep their output readable.
         "django.request": {"level": "ERROR" if TESTING else "WARNING"},
+        "wms.security": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }

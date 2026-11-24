@@ -52,10 +52,10 @@ class WorkerRoleTests(TestCase):
 
         self.assertContains(self.client.get(reverse("users:register")), "Pardozchi")
         self.client.post(reverse("users:register"), {
-            "username": "jasur", "full_name": "Jasur Aliyev", "roles": ["PARDOZCHI"],
+            "phone": "+998933334455", "full_name": "Jasur Aliyev", "roles": ["PARDOZCHI"],
             "password1": PASSWORD, "password2": PASSWORD,
         })
-        self.assertEqual(User.objects.get(username="jasur").roles, ["PARDOZCHI"])
+        self.assertEqual(User.objects.get(phone="+998933334455").roles, ["PARDOZCHI"])
 
         worker = make_user("pardozchi", ["PARDOZCHI"])
         make_material("Lak", MaterialCategory.LIQUID, MeasurementUnit.LITER, allowed_roles=["PARDOZCHI"], container_size=Decimal("5"))

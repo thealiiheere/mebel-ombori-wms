@@ -11,7 +11,7 @@ from apps.users.models import User, UserRole
 
 def registration_data(**overrides):
     data = {
-        "username": "bobur",
+        "phone": "+998 90 123 45 67",
         "full_name": "Bobur Karimov",
         "roles": [UserRole.ARRACHI, UserRole.ROVERCHI],
         "password1": PASSWORD,
@@ -26,7 +26,7 @@ class SelfRegistrationTests(TestCase):
         response = self.client.post(reverse("users:register"), registration_data())
 
         self.assertRedirects(response, reverse("users:register_done"))
-        user = User.objects.get(username="bobur")
+        user = User.objects.get(phone="+998901234567")
         self.assertFalse(user.is_approved)
         self.assertTrue(user.is_active)
         self.assertEqual(user.full_name, "Bobur Karimov")
@@ -40,13 +40,13 @@ class SelfRegistrationTests(TestCase):
     def test_at_least_one_role_is_required(self):
         response = self.client.post(reverse("users:register"), registration_data(roles=[]))
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(User.objects.filter(username="bobur").exists())
+        self.assertFalse(User.objects.filter(phone="+998901234567").exists())
         self.assertFormError(response.context["form"], "roles", "Kamida bitta kasbni tanlang.")
 
     def test_workers_cannot_grant_themselves_the_admin_role(self):
         response = self.client.post(reverse("users:register"), registration_data(roles=[UserRole.ADMIN]))
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(User.objects.filter(username="bobur").exists())
+        self.assertFalse(User.objects.filter(phone="+998901234567").exists())
 
     def test_registration_does_not_log_the_worker_in(self):
         self.client.post(reverse("users:register"), registration_data())
@@ -166,33 +166,33 @@ class RegistrationApiTests(TestCase):
     def test_api_registration_creates_pending_worker(self):
         response = self.client.post(
             "/api/auth/register/",
-            {"username": "dilshod", "full_name": "Dilshod Rahimov", "password": PASSWORD, "roles": [UserRole.KRASKACHI]},
+            {"phone": "+998912223344", "full_name": "Dilshod Rahimov", "password": PASSWORD, "roles": [UserRole.KRASKACHI]},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201, response.content)
-        user = User.objects.get(username="dilshod")
+        user = User.objects.get(phone="+998912223344")
         self.assertFalse(user.is_approved)
         self.assertEqual(user.roles, [UserRole.KRASKACHI])
 
     def test_api_registration_rejects_the_admin_role(self):
         response = self.client.post(
             "/api/auth/register/",
-            {"username": "sly", "full_name": "Sly", "password": PASSWORD, "roles": [UserRole.ADMIN]},
+            {"phone": "+998912223355", "full_name": "Sly", "password": PASSWORD, "roles": [UserRole.ADMIN]},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("roles", response.json())
-        self.assertFalse(User.objects.filter(username="sly").exists())
+        self.assertFalse(User.objects.filter(phone="+998912223355").exists())
 
     def test_api_registration_rejects_a_weak_password(self):
         response = self.client.post(
             "/api/auth/register/",
-            {"username": "sly", "full_name": "Sly", "password": "12345678", "roles": [UserRole.ARRACHI]},
+            {"phone": "+998912223355", "full_name": "Sly", "password": "12345678", "roles": [UserRole.ARRACHI]},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("password", response.json())
-        self.assertFalse(User.objects.filter(username="sly").exists())
+        self.assertFalse(User.objects.filter(phone="+998912223355").exists())
 
     def test_admin_approves_through_api_and_workers_cannot(self):
         admin = make_admin()

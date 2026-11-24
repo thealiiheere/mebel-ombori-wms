@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.users.permissions import IsWarehouseAdmin
+from apps.users.permissions import CanTakeStock, IsWarehouseAdmin
 
 from .. import selectors, services
 from ..models import BaseMaterial, InventoryTransaction, TransactionType, category_codes
@@ -53,7 +53,12 @@ class WholeMaterialViewSet(viewsets.ReadOnlyModelViewSet):
         qs = selectors.visible_whole_stock(self.request.user)
         return selectors.search_stock(qs, **_search_params(self.request)).order_by("material__name")
 
-    @action(detail=True, methods=["post"], serializer_class=WithdrawSerializer)
+    @action(
+        detail=True,
+        methods=["post"],
+        serializer_class=WithdrawSerializer,
+        permission_classes=[CanTakeStock],
+    )
     def withdraw(self, request, pk=None):
         stock = self.get_object()
         payload = WithdrawSerializer(data=request.data)
@@ -96,7 +101,12 @@ class LeftoverOffcutViewSet(
         )
         return Response(self.get_serializer(offcut).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["post"], serializer_class=OffcutWithdrawSerializer)
+    @action(
+        detail=True,
+        methods=["post"],
+        serializer_class=OffcutWithdrawSerializer,
+        permission_classes=[CanTakeStock],
+    )
     def withdraw(self, request, pk=None):
         offcut = self.get_object()
         payload = OffcutWithdrawSerializer(data=request.data)

@@ -12,7 +12,11 @@ from django.utils.translation import gettext as _
 from django.views import View
 from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
 
-from apps.users.permissions import ApprovedUserRequiredMixin, WarehouseAdminRequiredMixin
+from apps.users.permissions import (
+    ApprovedUserRequiredMixin,
+    StockTakerRequiredMixin,
+    WarehouseAdminRequiredMixin,
+)
 
 from . import selectors, services
 from .templatetags.wms import month_name
@@ -86,7 +90,7 @@ class HomeView(ApprovedUserRequiredMixin, TemplateView):
         return context
 
 
-class WithdrawWholeView(ApprovedUserRequiredMixin, FormView):
+class WithdrawWholeView(StockTakerRequiredMixin, FormView):
     """'Oldim' — worker takes whole units off the shelf."""
 
     form_class = WithdrawWholeForm
@@ -180,7 +184,7 @@ class OffcutCreateView(ApprovedUserRequiredMixin, FormView):
         return redirect(reverse("inventory:home") + "?tab=offcuts")
 
 
-class OffcutWithdrawView(ApprovedUserRequiredMixin, FormView):
+class OffcutWithdrawView(StockTakerRequiredMixin, FormView):
     form_class = WithdrawOffcutForm
     template_name = "inventory/withdraw_offcut.html"
 

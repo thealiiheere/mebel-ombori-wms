@@ -1,5 +1,4 @@
 from django.contrib.auth import password_validation
-from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
 from rest_framework import generics, mixins, serializers, status, viewsets
@@ -10,7 +9,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from . import services
-from .models import User, all_role_choices, worker_role_choices
+from .models import User, all_role_choices, normalize_phone, worker_role_choices
 from .permissions import IsWarehouseAdmin
 
 
@@ -23,6 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "username",
+            "phone",
             "full_name",
             "roles",
             "role_labels",
@@ -35,7 +35,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegistrationSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=150, validators=[UnicodeUsernameValidator()])
+    phone = serializers.CharField(max_length=25)
     full_name = serializers.CharField(max_length=255)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
     roles = serializers.MultipleChoiceField(choices=())
@@ -44,13 +44,17 @@ class RegistrationSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
         self.fields["roles"].choices = worker_role_choices()  # trades live in the database
 
-    def validate_username(self, value):
-        if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError(_("Bu login band. Boshqasini tanlang."))
-        return value
+    def validate_phone(self, value):
+        try:
+            phone = normalize_phone(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        if User.objects.filter(phone=phone).exists():
+            raise serializers.ValidationError(_("Bu raqam allaqachon ro'yxatdan o'tgan."))
+        return phone
 
     def validate(self, attrs):
-        candidate = User(username=attrs["username"], full_name=attrs["full_name"])
+        candidate = User(username=attrs["phone"], phone=attrs["phone"], full_name=attrs["full_name"])
         try:
             password_validation.validate_password(attrs["password"], candidate)
         except DjangoValidationError as exc:
@@ -59,7 +63,7 @@ class RegistrationSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         return services.register_worker(
-            username=validated_data["username"],
+            phone=validated_data["phone"],
             password=validated_data["password"],
             full_name=validated_data["full_name"],
             roles=list(validated_data["roles"]),

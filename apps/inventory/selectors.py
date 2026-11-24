@@ -129,13 +129,35 @@ def low_stock_items() -> QuerySet[WholeMaterial]:
 
 
 def estimated_offcut_value_usd() -> Decimal:
-    """Informational: recoverable value sitting in offcuts (not part of the valuation)."""
-    total = Decimal("0.00")
-    for offcut in LeftoverOffcut.objects.select_related("material", "material__whole_stock"):
-        value = offcut.estimated_value_usd
-        if value:
-            total += value
-    return total
+    """
+    Informational: recoverable value sitting in offcuts (not part of the valuation).
+
+    Calculated via database-level SQL aggregation to avoid loading offcut records
+    into application memory.
+    """
+    line_val = Round(
+        ExpressionWrapper(
+            (
+                F("length_mm")
+                * F("width_mm")
+                * F("material__unit_price_usd")
+                * F("quantity")
+                * Value(Decimal("1.000000"), output_field=MONEY)
+            )
+            / (F("material__whole_stock__length_mm") * F("material__whole_stock__width_mm")),
+            output_field=MONEY,
+        ),
+        2,
+    )
+    total = (
+        LeftoverOffcut.objects.filter(
+            material__whole_stock__length_mm__isnull=False,
+            material__whole_stock__width_mm__isnull=False,
+            material__whole_stock__length_mm__gt=0,
+            material__whole_stock__width_mm__gt=0,
+        ).aggregate(total=Coalesce(Sum(line_val, output_field=MONEY), ZERO_MONEY))["total"]
+    )
+    return Decimal(total).quantize(Decimal("0.01"))
 
 
 # ---------------------------------------------------------------------------

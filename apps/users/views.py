@@ -1,3 +1,5 @@
+import re
+
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.core.exceptions import ValidationError
@@ -94,7 +96,12 @@ class UserListView(WarehouseAdminRequiredMixin, ListView):
         qs = User.objects.all().order_by("-is_active", "full_name", "username")
         query = self.request.GET.get("q", "").strip()
         if query:
-            qs = qs.filter(Q(username__icontains=query) | Q(full_name__icontains=query))
+            # A phone may be typed with spaces or without the +998 prefix.
+            digits = re.sub(r"\D", "", query)
+            match = Q(full_name__icontains=query) | Q(username__icontains=query)
+            if digits:
+                match |= Q(phone__contains=digits)
+            qs = qs.filter(match)
         return qs
 
     def get_context_data(self, **kwargs):

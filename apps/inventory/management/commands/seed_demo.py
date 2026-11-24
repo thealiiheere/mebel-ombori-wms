@@ -27,7 +27,7 @@ from apps.users.models import User, UserRole
 DEFAULT_DEMO_PASSWORD = "ombor-demo-2026"
 
 WORKERS = [
-    # username, full name, roles, approved
+    # username, full name, roles, approved  (phones are handed out below, +99890 000 00 0N)
     ("arrachi", "Bobur Karimov", [UserRole.ARRACHI], True),
     ("roverchi", "Sardor Aliyev", [UserRole.ROVERCHI, UserRole.ARRACHI], True),
     ("kraskachi", "Dilshod Rahimov", [UserRole.KRASKACHI], True),
@@ -84,15 +84,28 @@ class Command(BaseCommand):
             self._history(users)
         self.stdout.write(self.style.SUCCESS(
             f"Demo data loaded: {User.objects.count()} users, {BaseMaterial.objects.count()} materials, "
-            f"{LeftoverOffcut.objects.count()} offcuts. Log in as admin / arrachi / kraskachi / sborkachi / roverchi."
+            f"{LeftoverOffcut.objects.count()} offcuts."
         ))
+        self.stdout.write("Log in with a phone number and the demo password:")
+        for user in User.objects.order_by("phone"):
+            self.stdout.write(f"  {user.phone_display:<22} {user.full_name}  ({', '.join(user.role_labels) or 'pending'})")
 
     # ------------------------------------------------------------------
     def _users(self, password):
-        admin = User.objects.create_superuser("admin", password=password, full_name="Akmal Rustamov")
+        admin_phone = "+998900000001"
+        admin = User.objects.create_superuser(
+            admin_phone, password=password, full_name="Akmal Rustamov", phone=admin_phone
+        )
         users = {"admin": admin}
-        for username, full_name, roles, approved in WORKERS:
-            user = User(username=username, full_name=full_name, roles=[str(r) for r in roles], is_approved=approved)
+        for index, (username, full_name, roles, approved) in enumerate(WORKERS, start=2):
+            phone = f"+99890000000{index}"
+            user = User(
+                username=phone,
+                phone=phone,
+                full_name=full_name,
+                roles=[str(r) for r in roles],
+                is_approved=approved,
+            )
             user.set_password(password)
             user.save()
             if approved:

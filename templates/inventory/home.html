@@ -70,7 +70,9 @@
           <div class="num hidden text-right text-muted md:block">{{ m.minimum_threshold|qty }} {{ m.unit_short }}</div>
           {% if user.is_warehouse_admin %}<div class="num hidden text-right md:block">{{ stock.total_value_usd|usd }}</div>{% endif %}
           <div class="text-right">
-            {% if stock.quantity > 0 %}
+            {% if user.is_warehouse_admin %}
+              <span class="pill pill-neutral">{% translate "Ishchi oladi" %}</span>
+            {% elif stock.quantity > 0 %}
               <a href="{% url 'inventory:withdraw_whole' stock.pk %}" class="btn btn-secondary min-h-11 md:min-h-9" aria-label="{% blocktranslate with name=m.name %}{{ name }} — oldim{% endblocktranslate %}">{% icon "take" %} {% translate "Oldim" %}</a>
             {% else %}
               <span class="pill pill-neutral">{% translate "Tugagan" %}</span>
@@ -114,7 +116,11 @@
             <p class="text-muted" style="font-size:12px">{{ offcut.created_at|date:"j E, H:i" }}</p>
           </div>
           <div class="text-right">
+            {% if user.is_warehouse_admin %}
+            <span class="pill pill-neutral">{% translate "Ishchi oladi" %}</span>
+            {% else %}
             <a href="{% url 'inventory:offcut_withdraw' offcut.pk %}" class="btn btn-secondary min-h-11 md:min-h-9" aria-label="{% blocktranslate with name=m.name length=offcut.length_mm width=offcut.width_mm %}{{ name }} {{ length }}×{{ width }} — oldim{% endblocktranslate %}">{% icon "take" %} {% translate "Oldim" %}</a>
+            {% endif %}
           </div>
         </li>
         {% endwith %}{% endfor %}

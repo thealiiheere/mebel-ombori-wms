@@ -4,18 +4,47 @@
 {% block content %}
 <a href="{% url 'users:user_list' %}" class="inline-flex items-center gap-1.5 text-muted hover:text-ink">{% icon "back" %} {% translate "Ishchilar" %}</a>
 <h1 class="mt-3 font-bold text-[24px] leading-8 lg:text-[32px] lg:leading-10">{{ account.display_name }}</h1>
-<p class="mt-1 text-muted" style="font-size:15px">@{{ account.username }} · {% blocktranslate with date=account.date_joined|date:"Y-m-d" %}ro'yxatdan o'tgan {{ date }}{% endblocktranslate %}{% if account.approved_at %} · {% blocktranslate with date=account.approved_at|date:"Y-m-d" %}tasdiqlangan {{ date }}{% endblocktranslate %}{% endif %}</p>
+<p class="num mt-1 text-muted" style="font-size:15px">{{ account.login_id }} · {% blocktranslate with date=account.date_joined|date:"Y-m-d" %}ro'yxatdan o'tgan {{ date }}{% endblocktranslate %}{% if account.approved_at %} · {% blocktranslate with date=account.approved_at|date:"Y-m-d" %}tasdiqlangan {{ date }}{% endblocktranslate %}{% endif %}</p>
+
+{# ---- Kirish ma'lumotlari: admin ishchiga telefon orqali aytib berishi uchun ---- #}
+<div class="panel mt-6 max-w-[640px] p-5 sm:p-6" x-data="{ show: false }">
+  <h2 class="panel-title">{% translate "Kirish ma'lumotlari" %}</h2>
+  <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+    <div>
+      <dt class="text-muted" style="font-size:12px">{% translate "Telefon raqami" %}</dt>
+      <dd class="num font-medium">{{ account.phone_display|default:"—" }}</dd>
+    </div>
+    <div>
+      <dt class="text-muted" style="font-size:12px">{% translate "Parol" %}</dt>
+      <dd class="flex items-center gap-2">
+        {% if account.password_plain %}
+          <span class="num font-medium" x-show="show" x-cloak>{{ account.password_plain }}</span>
+          <span class="num font-medium tracking-widest" x-show="!show">••••••••</span>
+          <button type="button" @click="show = !show" class="text-muted hover:text-ink"
+                  :aria-label="show ? '{% translate "Parolni yashirish" %}' : '{% translate "Parolni ko'rsatish" %}'"
+                  aria-label="{% translate "Parolni ko'rsatish" %}">
+            <span x-show="!show">{% icon "eye" 18 %}</span>
+            <span x-show="show" x-cloak>{% icon "eye-off" 18 %}</span>
+          </button>
+        {% else %}
+          <span class="text-muted">{% translate "Noma'lum — yangisini o'rnating" %}</span>
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
+</div>
 
 <form method="post" class="panel form-stack mt-6 max-w-[640px] p-5 sm:p-6" novalidate>
   {% csrf_token %}
   {% include "partials/form_errors.html" %}
   {% include "partials/field.html" with field=form.full_name %}
+  {% include "partials/field.html" with field=form.phone %}
   {% include "partials/field.html" with field=form.roles %}
   <div class="grid gap-2 sm:grid-cols-2">
     {% include "partials/field.html" with field=form.is_approved %}
     {% include "partials/field.html" with field=form.is_active %}
   </div>
-  {% include "partials/field.html" with field=form.new_password %}
+  {% include "partials/password_field.html" with field=form.new_password %}
   <div class="flex flex-wrap justify-end gap-2">
     <a href="{% url 'users:user_list' %}" class="btn btn-secondary btn-lg">{% translate "Bekor qilish" %}</a>
     <button type="submit" class="btn btn-primary btn-lg">{% translate "Saqlash" %}</button>

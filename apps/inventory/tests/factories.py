@@ -1,6 +1,7 @@
 """Small helpers for building test data through the real service layer."""
 
 import datetime as dt
+import itertools
 from contextlib import contextmanager
 from decimal import Decimal
 from unittest import mock
@@ -14,10 +15,19 @@ from apps.users.models import User, UserRole
 PASSWORD = "Ombor-test-Parol-91"
 
 
+#: Hands out +998 90 000 00 NN so every test user has a distinct login phone.
+_phone_counter = itertools.count(1)
+
+
+def next_phone() -> str:
+    return f"+99890000{next(_phone_counter):04d}"
+
+
 def make_user(username: str, roles=(), *, approved: bool = True, admin: bool = False, **extra) -> User:
     roles = list(roles)
     if admin and UserRole.ADMIN not in roles:
         roles.append(UserRole.ADMIN)
+    extra.setdefault("phone", next_phone())
     user = User(username=username, full_name=extra.pop("full_name", username.title()), roles=roles, is_approved=approved, **extra)
     user.set_password(PASSWORD)
     user.save()

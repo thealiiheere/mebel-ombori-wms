@@ -12,9 +12,42 @@ from .models import (
     WorkerRole,
     all_role_choices,
     localized_trade_name,
+    normalize_phone,
     normalize_roles,
     worker_role_choices,
 )
+
+
+#: Lets ``partials/password_field.html`` flip the input between dots and plain text.
+PASSWORD_EYE_ATTRS = {"x-bind:type": "show ? 'text' : 'password'"}
+
+
+def with_eye(field):
+    """Mark a password field so the shared partial can reveal it."""
+    field.widget.attrs.update(PASSWORD_EYE_ATTRS)
+    return field
+
+
+class PhoneField(forms.CharField):
+    """A phone number typed any way the worker likes, stored in one canonical form."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("label", _("Telefon raqami"))
+        kwargs.setdefault("max_length", 25)
+        super().__init__(**kwargs)
+        self.widget.attrs.update(
+            {
+                "inputmode": "tel",
+                "autocomplete": "tel",
+                "placeholder": "+998 90 123 45 67",
+            }
+        )
+
+    def clean(self, value):
+        value = super().clean(value)
+        if not value:
+            return value
+        return normalize_phone(value)
 
 
 class LoginForm(AuthenticationForm):
@@ -28,13 +61,35 @@ class LoginForm(AuthenticationForm):
         ),
     }
 
+    error_messages_extra = {"invalid_phone": _("Telefon raqami yoki parol noto'g'ri.")}
+
     def __init__(self, request=None, *args, **kwargs):
         super().__init__(request, *args, **kwargs)
-        self.fields["username"].label = _("Login")
-        self.fields["username"].widget.attrs.update(
-            {"autocapitalize": "none", "autocomplete": "username", "autofocus": True}
+        field = self.fields["username"]
+        field.label = _("Telefon raqami")
+        field.max_length = 25
+        field.widget.attrs.update(
+            {
+                "autocapitalize": "none",
+                "autocomplete": "tel",
+                "inputmode": "tel",
+                "autofocus": True,
+                "placeholder": "+998 90 123 45 67",
+            }
         )
-        self.fields["password"].label = _("Parol")
+        with_eye(self.fields["password"]).label = _("Parol")
+
+    def clean_username(self):
+        """Turn whatever was typed into the stored phone form.
+
+        Anything that is not a phone number is passed through untouched, so an
+        account made with ``createsuperuser`` can still sign in with its username.
+        """
+        value = self.cleaned_data.get("username", "")
+        try:
+            return normalize_phone(value)
+        except forms.ValidationError:
+            return value
 
     def clean(self):
         username = self.cleaned_data.get("username")
@@ -42,7 +97,10 @@ class LoginForm(AuthenticationForm):
         if username and password:
             # The auth backend rejects unapproved users outright; detect that case
             # (correct password, not yet approved) so we can show a helpful message.
-            user = User._default_manager.filter(username=username).first()
+            user = (
+                User._default_manager.filter(phone=username).first()
+                or User._default_manager.filter(username=username).first()
+            )
             if (
                 user is not None
                 and user.is_active
@@ -56,6 +114,7 @@ class LoginForm(AuthenticationForm):
 
 class WorkerRegistrationForm(UserCreationForm):
     full_name = forms.CharField(label=_("To'liq ism (F.I.Sh.)"), max_length=255)
+    phone = PhoneField(help_text=_("Tizimga shu raqam bilan kirasiz."))
     roles = forms.MultipleChoiceField(
         label=_("Kasbingiz"),
         choices=worker_role_choices,
@@ -66,21 +125,28 @@ class WorkerRegistrationForm(UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = ("username", "full_name")
+        fields = ("full_name",)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["username"].label = _("Login")
-        self.fields["username"].help_text = _("Faqat lotin harflari, raqamlar va @/./+/-/_ belgilar.")
-        self.fields["username"].widget.attrs.update({"autocapitalize": "none", "autocomplete": "username"})
-        self.fields["password1"].label = _("Parol")
+        # The phone number is the login identifier; ``username`` is derived from it.
+        self.fields.pop("username", None)
+        with_eye(self.fields["password1"]).label = _("Parol")
         self.fields["password1"].help_text = _("Kamida 8 ta belgi; faqat raqamlardan iborat bo'lmasin.")
-        self.fields["password2"].label = _("Parolni takrorlang")
+        with_eye(self.fields["password2"]).label = _("Parolni takrorlang")
         self.fields["password2"].help_text = ""
+
+    def clean_phone(self):
+        phone = self.cleaned_data["phone"]
+        if User.objects.filter(phone=phone).exists():
+            raise forms.ValidationError(_("Bu raqam allaqachon ro'yxatdan o'tgan."))
+        return phone
 
     def save(self, commit=True):
         user = super().save(commit=False)
         user.full_name = self.cleaned_data["full_name"].strip()
+        user.phone = self.cleaned_data["phone"]
+        user.username = user.phone
         user.roles = normalize_roles(self.cleaned_data["roles"])
         user.is_approved = False
         user.is_active = True
@@ -107,6 +173,7 @@ class RoleAssignmentForm(forms.ModelForm):
 class UserAdminEditForm(forms.ModelForm):
     """Used by admins to manage an existing account."""
 
+    phone = PhoneField(required=False, help_text=_("Ishchi shu raqam bilan tizimga kiradi."))
     roles = forms.MultipleChoiceField(
         label=_("Rollar"),
         choices=all_role_choices,
@@ -117,13 +184,13 @@ class UserAdminEditForm(forms.ModelForm):
         label=_("Yangi parol"),
         required=False,
         strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", **PASSWORD_EYE_ATTRS}),
         help_text=_("Ishchi parolini unutgan bo'lsa, shu yerda yangisini o'rnating."),
     )
 
     class Meta:
         model = User
-        fields = ("full_name", "roles", "is_approved", "is_active")
+        fields = ("full_name", "phone", "roles", "is_approved", "is_active")
         labels = {"is_approved": _("Tasdiqlangan"), "is_active": _("Faol hisob")}
         # The model/Django defaults are English ("Admin approval status for worker login", "Designates whether...").
         help_texts = {
@@ -141,6 +208,12 @@ class UserAdminEditForm(forms.ModelForm):
             password_validation.validate_password(password, self.instance)
         return password
 
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        if phone and User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError(_("Bu raqam boshqa hisobga biriktirilgan."))
+        return phone
+
     def clean(self):
         cleaned = super().clean()
         if self.acting_user is not None and self.instance.pk == self.acting_user.pk:
@@ -155,6 +228,9 @@ class UserAdminEditForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.roles = normalize_roles(self.cleaned_data.get("roles"))
+        # The phone is the login identifier, so ``username`` follows it.
+        if user.phone:
+            user.username = user.phone
         if self.cleaned_data.get("new_password"):
             user.set_password(self.cleaned_data["new_password"])
         if commit:

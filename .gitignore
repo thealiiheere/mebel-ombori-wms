@@ -6,6 +6,7 @@ __pycache__/
 # Local configuration and data
 .env
 db.sqlite3
+*.sqlite3
 staticfiles/
 
 # Front-end build tooling (built CSS and vendored JS/fonts in static/ are committed)

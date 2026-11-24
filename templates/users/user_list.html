@@ -14,22 +14,45 @@
 <form method="get" class="mt-6" role="search">
   <div class="relative md:w-[316px]">
     <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">{% icon "search" 16 %}</span>
-    {% translate "Ism yoki login" as search_label %}<input type="search" name="q" value="{{ query }}" placeholder="{{ search_label }}" aria-label="{{ search_label }}" class="control !pl-9">
+    {% translate "Ism yoki telefon raqami" as search_label %}<input type="search" name="q" value="{{ query }}" placeholder="{{ search_label }}" aria-label="{{ search_label }}" class="control !pl-9">
   </div>
 </form>
 
 <div class="panel mt-4 overflow-hidden">
-  <div class="hidden grid-cols-[minmax(0,1fr)_260px_140px_auto] gap-x-4 px-5 pb-2 pt-4 text-muted md:grid" style="font-size:12px" aria-hidden="true">
-    <span>{% translate "Ishchi" %}</span><span>{% translate "Kasblari" %}</span><span>{% translate "Holati" %}</span><span></span>
+  <div class="hidden grid-cols-[minmax(0,1fr)_200px_180px_120px_auto] gap-x-4 px-5 pb-2 pt-4 text-muted md:grid" style="font-size:12px" aria-hidden="true">
+    <span>{% translate "Ishchi" %}</span><span>{% translate "Kasblari" %}</span><span>{% translate "Telefon va parol" %}</span><span>{% translate "Holati" %}</span><span></span>
   </div>
   <ul>
     {% for u in users %}
-    <li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-t border-rule px-4 py-3 md:grid-cols-[minmax(0,1fr)_260px_140px_auto] md:px-5">
+    <li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-t border-rule px-4 py-3 md:grid-cols-[minmax(0,1fr)_200px_180px_120px_auto] md:px-5" x-data="{ show: false }">
       <div class="min-w-0">
         <p class="truncate font-medium">{{ u.display_name }}{% if u.pk == user.pk %} <span class="text-muted font-normal">{% translate "(siz)" %}</span>{% endif %}</p>
-        <p class="truncate text-muted" style="font-size:13px">@{{ u.username }}<span class="md:hidden"> · {% for r in u.roles %}{{ r|short_role }}{% if not forloop.last %}, {% endif %}{% empty %}{% translate "rol yo'q" %}{% endfor %}</span></p>
+        <p class="truncate text-muted" style="font-size:13px"><span class="num">{{ u.login_id }}</span><span class="md:hidden"> · {% for r in u.roles %}{{ r|short_role }}{% if not forloop.last %}, {% endif %}{% empty %}{% translate "rol yo'q" %}{% endfor %}</span></p>
+        <p class="mt-0.5 flex items-center gap-2 md:hidden" style="font-size:13px">
+          {% if u.password_plain %}
+            <span class="num" x-show="show" x-cloak>{{ u.password_plain }}</span>
+            <span class="num tracking-widest" x-show="!show">••••••</span>
+            <button type="button" @click="show = !show" class="text-muted" aria-label="{% translate "Parolni ko'rsatish" %}">
+              <span x-show="!show">{% icon "eye" 15 %}</span><span x-show="show" x-cloak>{% icon "eye-off" 15 %}</span>
+            </button>
+          {% else %}<span class="text-muted">{% translate "parol noma'lum" %}</span>{% endif %}
+        </p>
       </div>
       <p class="hidden truncate md:block">{% for r in u.roles %}{{ r|short_role }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-muted">—</span>{% endfor %}</p>
+      <div class="hidden min-w-0 md:block">
+        <p class="num truncate">{{ u.phone_display|default:"—" }}</p>
+        <p class="flex items-center gap-1.5 text-muted" style="font-size:13px">
+          {% if u.password_plain %}
+            <span class="num truncate" x-show="show" x-cloak>{{ u.password_plain }}</span>
+            <span class="num tracking-widest" x-show="!show">••••••</span>
+            <button type="button" @click="show = !show" class="flex-none hover:text-ink"
+                    :aria-label="show ? '{% translate "Parolni yashirish" %}' : '{% translate "Parolni ko'rsatish" %}'"
+                    aria-label="{% translate "Parolni ko'rsatish" %}">
+              <span x-show="!show">{% icon "eye" 15 %}</span><span x-show="show" x-cloak>{% icon "eye-off" 15 %}</span>
+            </button>
+          {% else %}{% translate "noma'lum" %}{% endif %}
+        </p>
+      </div>
       <div class="hidden md:block">
         {% if not u.is_active %}<span class="pill pill-neutral">{% translate "O'chirilgan" %}</span>
         {% elif u.is_superuser or u.is_approved %}<span class="pill pill-pos">{% translate "Faol" %}</span>

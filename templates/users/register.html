@@ -11,10 +11,10 @@
     {% csrf_token %}
     {% include "partials/form_errors.html" %}
     {% include "partials/field.html" with field=form.full_name %}
-    {% include "partials/field.html" with field=form.username %}
+    {% include "partials/field.html" with field=form.phone %}
     {% include "partials/field.html" with field=form.roles %}
-    {% include "partials/field.html" with field=form.password1 %}
-    {% include "partials/field.html" with field=form.password2 %}
+    {% include "partials/password_field.html" with field=form.password1 %}
+    {% include "partials/password_field.html" with field=form.password2 %}
     <button type="submit" class="btn btn-primary btn-lg btn-block mt-2">{% translate "So'rov yuborish" %}</button>
   </form>
 </div>

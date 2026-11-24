@@ -1,6 +1,7 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -84,13 +85,12 @@ class Category(models.Model):
         return self.name
 
 
-# Per-process cache of (code, name) pairs; cleared on every request and whenever a category changes.
-_category_cache: list[tuple[str, str]] | None = None
+# Per-process category cache, cached thread-safely via django.core.cache.
+CATEGORY_CACHE_KEY = "wms:category_choices"
 
 
 def clear_category_cache(*args, **kwargs) -> None:
-    global _category_cache
-    _category_cache = None
+    cache.delete(CATEGORY_CACHE_KEY)
 
 
 def localized_category_name(name: str) -> str:
@@ -100,10 +100,11 @@ def localized_category_name(name: str) -> str:
 
 def category_choices() -> list[tuple[str, str]]:
     """Categories as (code, name) pairs in the current language. Usable as a form ``choices`` callable."""
-    global _category_cache
-    if _category_cache is None:
-        _category_cache = list(Category.objects.values_list("code", "name"))
-    return [(code, localized_category_name(name)) for code, name in _category_cache]
+    raw = cache.get(CATEGORY_CACHE_KEY)
+    if raw is None:
+        raw = list(Category.objects.values_list("code", "name"))
+        cache.set(CATEGORY_CACHE_KEY, raw, timeout=300)
+    return [(code, localized_category_name(name)) for code, name in raw]
 
 
 def category_codes() -> list[str]:
